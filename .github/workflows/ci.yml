@@ -1,0 +1,99 @@
+name: Rustito CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.80.0
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Cache Cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry/src
+          key: cargo-index-${{ runner.os }}-${{ hashFiles('Cargo.toml') }}
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Verify binary
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            ./target/release/rustito
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            ./target/release/rustito
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            .\target\release\rustito.exe
+          fi
+
+  audit:
+    if: always()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo audit
+        run: cargo install cargo-audit
+      - name: Run cargo audit
+        run: cargo audit
+
+  deny:
+    if: always()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo deny
+        run: cargo install cargo-deny
+      - name: Check licensing
+        run: cargo deny check
+
+  release:
+    if: starts_with(github.ref, 'refs/tags/')
+    needs: [audit, deny]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build binary
+        run: cargo build --release
+      - name: Upload release asset
+        uses: actions/upload-artifact@v3
+        with:
+          name: rustito-${{ github.sha }}
+          path: target/release/rustito.exe
