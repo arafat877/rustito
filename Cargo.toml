@@ -6,6 +6,10 @@ description = "A lightweight cross-platform system cockpit written in Rust"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/arafat877/rustito"
 
+[features]
+default = []
+gui = ["eframe/default"]
+
 [dependencies]
 sysinfo = "0.37"
 thiserror = "2"
@@ -13,3 +17,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 dirs = "6"
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.33"
+egui_plot = "0.37.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-appender = "0.2"
+nvml-wrapper = { version = "0.11", optional = true }
